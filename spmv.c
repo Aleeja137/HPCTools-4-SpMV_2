@@ -7,13 +7,13 @@
 #include <gsl/gsl_spblas.h>
 #include "timer.h"
 #include "spmv.h"
-#include "mkl_spblas.h"
+// #include "mkl.h"
 
-// #define DEFAULT_SIZE 16384
-// #define DEFAULT_DENSITY 0.1
+#define DEFAULT_SIZE 16384
+#define DEFAULT_DENSITY 0.1
 
-#define DEFAULT_SIZE 4
-#define DEFAULT_DENSITY 1
+// #define DEFAULT_SIZE 4
+// #define DEFAULT_DENSITY 1
 
 unsigned int populate_sparse_matrix(double mat[], unsigned int n, double density, unsigned int seed)
 {
@@ -79,6 +79,7 @@ int main(int argc, char *argv[])
 {
   int size, i, j;  // number of rows and cols (size x size matrix)
   double density;  // aprox. ratio of non-zero values
+  int compiler = 0; // 0 for gcc, 1 for icc
 
   if (argc < 2) {
     size = DEFAULT_SIZE;
@@ -109,33 +110,35 @@ int main(int argc, char *argv[])
 
   #ifdef GCC
     printf("Compiled with gcc compiler\n\n");
+    compiler = 0;
   #elif ICC
-      printf("Compiled with icc compiler\n\n");
+    printf("Compiled with icc compiler\n\n");
+    compiler = 1;
   #endif
 
 
   /* --- Dense computation using CBLAS (eg. GSL's CBLAS implementation) --- */
-  #ifdef GCC
+  timeinfo start, now;
+  if (compiler == 0)
+  {
     printf("Dense computation\n----------------\n");
-    timeinfo start, now;
+    
     timestamp(&start);
 
     cblas_dgemv(CblasRowMajor, CblasNoTrans, size, size, 1.0, mat, size, vec, 1, 0.0, refsol, 1);
 
     timestamp(&now);
     printf("Time taken by CBLAS dense computation: %ld ms\n", diff_milli(&start, &now));
-  #elif ICC
+  } else {
     printf("Dense computation\n----------------\n");
-    timeinfo start, now;
     timestamp(&start);
 
     // TODO - change for MKL's blas multiplication
     cblas_dgemv(CblasRowMajor, CblasNoTrans, size, size, 1.0, mat, size, vec, 1, 0.0, refsol, 1);
 
     timestamp(&now);
-    printf("Time taken by MLK dense computation: %ld ms\n", diff_milli(&start, &now));
-  #endif
-
+    printf("Time taken by MLK BLAS dense computation: %ld ms\n", diff_milli(&start, &now));
+  }
 
   /* --- Dense computation using your own dense implementation --- */
   timestamp(&start);
@@ -177,27 +180,23 @@ int main(int argc, char *argv[])
   gsl_spmatrix *smat_csc = gsl_spmatrix_compress(smat_coo, GSL_SPMATRIX_CSC);
 
   /* --- Sparse computation using GSL's sparse algebra functions --- */
-  #ifdef GCC
-    printf("\nSparse computation\n----------------\n");
-    timestamp(&start);
-    gsl_spblas_dgemv(CblasNoTrans, 1.0, smat_coo, gsl_vec, 0.0, gsl_vec_result_coo);
-    timestamp(&now);
-    printf("Time taken by GSL COO sparse computation: %ld ms\n", diff_milli(&start, &now));
 
-    timestamp(&start);
-    gsl_spblas_dgemv(CblasNoTrans, 1.0, smat_csr, gsl_vec, 0.0, gsl_vec_result_csr);
-    timestamp(&now);
-    printf("Time taken by GSL CSR sparse computation: %ld ms\n", diff_milli(&start, &now));
+  printf("\nSparse computation\n----------------\n");
+  timestamp(&start);
+  gsl_spblas_dgemv(CblasNoTrans, 1.0, smat_coo, gsl_vec, 0.0, gsl_vec_result_coo);
+  timestamp(&now);
+  printf("Time taken by GSL COO sparse computation: %ld ms\n", diff_milli(&start, &now));
 
-    timestamp(&start);
-    gsl_spblas_dgemv(CblasNoTrans, 1.0, smat_csc, gsl_vec, 0.0, gsl_vec_result_csc);
-    timestamp(&now);
-    printf("Time taken by GSL CSC sparse computation: %ld ms\n", diff_milli(&start, &now));
+  timestamp(&start);
+  gsl_spblas_dgemv(CblasNoTrans, 1.0, smat_csr, gsl_vec, 0.0, gsl_vec_result_csr);
+  timestamp(&now);
+  printf("Time taken by GSL CSR sparse computation: %ld ms\n", diff_milli(&start, &now));
 
-  /* --- Sparse computation using MKL's sparse algebra functions --- */
-  #elif ICC
-    // TODO - implement the same using mkl_sparse_d_mv function. 
-  #endif
+  timestamp(&start);
+  gsl_spblas_dgemv(CblasNoTrans, 1.0, smat_csc, gsl_vec, 0.0, gsl_vec_result_csc);
+  timestamp(&now);
+  printf("Time taken by GSL CSC sparse computation: %ld ms\n", diff_milli(&start, &now));
+
 
   /* --- Your own sparse implementation --- */
 
