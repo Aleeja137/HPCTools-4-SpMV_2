@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O0 -Wall -Wextra # Default flags
+CFLAGS=-O0 -DGCC -Wall -Wextra # Default flags
 LDLIBS=-lgsl -lgslcblas
 
 SRC=spmv.c my_dense.c my_sparse.c timer.c
@@ -21,10 +21,10 @@ gcc-O3-vec: spmv
 gcc-Ofast-vec: CFLAGS = -DGCC -Wall -Wextra -Ofast -ftree-loop-vectorize -ftree-slp-vectorize -march=native
 gcc-Ofast-vec: spmv
 
-icc-O0: CFLAGS = -DICC -O0 -Wall -Wextra
+icc-O0: CFLAGS = -DICC -O0 -Wall -Wextra -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm
 icc-O0: spmv
-
-icc-O2-novec: CFLAGS = -DICC -O2 -Wall -Wextra -qno-vectorize
+ 
+icc-O2-novec: CFLAGS = -DICC -O2 -Wall -Wextra -qno-vectorize 
 icc-O2-novec: spmv
 
 icc-O3-vec: CFLAGS = -DICC -O3 -Wall -Wextra  -xHost

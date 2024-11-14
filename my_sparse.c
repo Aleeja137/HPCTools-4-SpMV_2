@@ -1,7 +1,9 @@
 #include "spmv.h"
 #include <stddef.h>
+#ifdef GCC
 #include <gsl/gsl_spmatrix.h>
 #include <gsl/gsl_vector.h>
+
 
 void my_sparse_coo(gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
 {
@@ -84,3 +86,31 @@ void my_sparse_csc(size_t n, gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *res
     n_elem_total += n_elem;
   }
 }
+
+#elif ICC
+#include "mkl.h"
+void my_sparse_coo_icc(MKL_INT *rows, MKL_INT *cols, double *values, double *vec, double *result, unsigned int nnz)
+{
+  size_t i, tot_elem = nnz;
+  int row, col;
+  double mat_element, vec_element, result_element;
+
+  for(i=0; i<tot_elem; i++)
+  {
+    row = rows[i];
+    col = cols[i];
+    mat_element = values[i];
+
+    // Do the multiplication and cumulative sum of result on target position
+    // double vec_element = gsl_vector_get(vec, col);
+    vec_element = vec[col];
+    // double result_element = gsl_vector_get(result, row);
+    result_element = result[row];
+    
+    // This works since gsl_vector_calloc initializes vector to zero, otherwise an initial set whould be done
+    result_element += mat_element * vec_element;
+    // gsl_vector_set(result, row, result_element);
+    result[row] = result_element;
+  }
+}
+#endif

@@ -1,109 +1,77 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <gsl/gsl_cblas.h>      // CBLAS in GSL (the GNU Scientific Library)
-#include <gsl/gsl_spmatrix.h>
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_spblas.h>
-#include <mkl.h>                // Intel MKL for CBLAS and Sparse BLAS
 #include <mkl_spblas.h>
-#include "timer.h"              // Assumed user-defined timing library
-#include "spmv.h"               // Assumed user-defined header for custom matrix functions
 
-#define DEFAULT_SIZE 4
-#define DEFAULT_DENSITY 1
+int main() {
+    // Matrix and vector size (assuming square matrix)
+    int size = 4;  // Replace with your matrix size
 
-unsigned int populate_sparse_matrix(double mat[], unsigned int n, double density, unsigned int seed) {
-    unsigned int nnz = 0;
-    srand(seed);
-    for (unsigned int i = 0; i < n * n; i++) {
-        if ((rand() % 100) / 100.0 < density) {
-            mat[i] = ((double)(rand() % 10) + (double)rand() / RAND_MAX) * (rand() % 2 == 0 ? 1 : -1);
-            nnz++;
-        } else {
-            mat[i] = 0;
-        }
-    }
-    return nnz;
-}
+    // Allocate and initialize dense matrix and vector
+    double *mat = (double *)malloc(size * size * sizeof(double));
+    double *vec = (double *)malloc(size * sizeof(double));
+    double *result = (double *)malloc(size * sizeof(double));
+    
+    // Fill in the matrix and vector with sample values
+    // Replace this with actual data
+    for (int i = 0; i < size * size; i++) mat[i] = (i % 3 == 0) ? i + 1.0 : 0.0; // sparse pattern
+    for (int i = 0; i < size; i++) vec[i] = 1.0;
 
-unsigned int populate_vector(double vec[], unsigned int size, unsigned int seed) {
-    srand(seed);
-    for (unsigned int i = 0; i < size; i++) {
-        vec[i] = ((double)(rand() % 10) + (double)rand() / RAND_MAX) * (rand() % 2 == 0 ? 1 : -1);
-    }
-    return 0;
-}
+    // Create MKL sparse matrix in COO format
+    sparse_matrix_t A;
+    int nnz = 0;  // Count non-zeros
+    for (int i = 0; i < size * size; i++) if (mat[i] != 0.0) nnz++;
 
-// Sparse matrix-vector multiplication using MKL (CSR format)
-void sparse_mkl_matvec(double *values, int *columns, int *rowIndex, double *x, double *y, int n) {
-    sparse_matrix_t mkl_A;
-    struct matrix_descr descr;
+    // Allocate COO format arrays
+    MKL_INT *rows = (MKL_INT *)malloc(nnz * sizeof(MKL_INT));
+    MKL_INT *cols = (MKL_INT *)malloc(nnz * sizeof(MKL_INT));
+    double *values = (double *)malloc(nnz * sizeof(double));
 
-    descr.type = SPARSE_MATRIX_TYPE_GENERAL;
-    mkl_sparse_d_create_csr(&mkl_A, SPARSE_INDEX_BASE_ZERO, n, n, rowIndex, rowIndex + 1, columns, values);
-    mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, 1.0, mkl_A, descr, x, 0.0, y);
-    mkl_sparse_destroy(mkl_A);
-}
-
-// Main function
-int main(int argc, char *argv[]) {
-    int n = DEFAULT_SIZE;
-    double density = DEFAULT_DENSITY;
-    unsigned int seed = 0;
-
-    double *dense_matrix = (double *)malloc(n * n * sizeof(double));
-    double *x = (double *)malloc(n * sizeof(double));
-    double *y_gnu = (double *)malloc(n * sizeof(double));
-    double *y_mkl = (double *)malloc(n * sizeof(double));
-
-    // Populate matrices and vectors
-    populate_sparse_matrix(dense_matrix, n, density, seed);
-    populate_vector(x, n, seed);
-
-    // Timing GNU CBLAS dense matrix-vector multiplication
-    timer_start();
-    cblas_dgemv(CblasRowMajor, CblasNoTrans, n, n, 1.0, dense_matrix, n, x, 1, 0.0, y_gnu, 1);
-    timer_stop();
-    printf("GNU CBLAS dense matrix-vector multiplication time: %f ms\n", timer_elapsed());
-
-    // Timing MKL dense matrix-vector multiplication
-    timer_start();
-    cblas_dgemv(CblasRowMajor, CblasNoTrans, n, n, 1.0, A, n, x, 1, 0.0, y, 1);
-    timer_stop();
-    printf("MKL dense matrix-vector multiplication time: %f ms\n", timer_elapsed());
-
-    // Convert dense matrix to CSR for sparse matrix operations
-    int nnz = 0;    // Count of non-zero elements
-    int *rowIndex = (int *)malloc((n + 1) * sizeof(int));
-    int *columns = (int *)malloc(n * n * sizeof(int));
-    double *values = (double *)malloc(n * n * sizeof(double));
-
-    rowIndex[0] = 0;
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            if (dense_matrix[i * n + j] != 0) {
-                values[nnz] = dense_matrix[i * n + j];
-                columns[nnz] = j;
-                nnz++;
+    // Fill COO format arrays
+    int idx = 0;
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            if (mat[i * size + j] != 0.0) {
+                rows[idx] = i;
+                cols[idx] = j;
+                values[idx] = mat[i * size + j];
+                idx++;
             }
         }
-        rowIndex[i + 1] = nnz;
     }
 
-    // Timing MKL sparse matrix-vector multiplication
-    timer_start();
-    sparse_mkl_matvec(values, columns, rowIndex, x, y_mkl, n);
-    timer_stop();
-    printf("MKL sparse matrix-vector multiplication time: %f ms\n", timer_elapsed());
+    // Create sparse matrix handle in MKL COO format
+    sparse_status_t status = mkl_sparse_d_create_coo(&A, SPARSE_INDEX_BASE_ZERO, size, size, nnz, rows, cols, values);
+    if (status != SPARSE_STATUS_SUCCESS) {
+        printf("Error creating sparse matrix\n");
+        return -1;
+    }
 
-    // Clean up memory
-    free(dense_matrix);
-    free(x);
-    free(y_gnu);
-    free(y_mkl);
-    free(rowIndex);
-    free(columns);
+    // Define matrix descriptor
+    struct matrix_descr descr;
+    descr.type = SPARSE_MATRIX_TYPE_GENERAL;
+
+    // Perform sparse matrix-vector multiplication
+    double alpha = 1.0;
+    double beta = 0.0;
+    status = mkl_sparse_d_mv(SPARSE_OPERATION_NON_TRANSPOSE, alpha, A, descr, vec, beta, result);
+    if (status != SPARSE_STATUS_SUCCESS) {
+        printf("Error performing sparse matrix-vector multiplication\n");
+        return -1;
+    }
+
+    // Output result
+    printf("Result vector:\n");
+    for (int i = 0; i < size; i++) {
+        printf("%f\n", result[i]);
+    }
+
+    // Cleanup
+    mkl_sparse_destroy(A);
+    free(mat);
+    free(vec);
+    free(result);
+    free(rows);
+    free(cols);
     free(values);
 
     return 0;
