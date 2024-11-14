@@ -1,0 +1,7 @@
+aux.c
+my_dense.o
+my_sparse.o
+spvm
+spmv.o
+timer.o
+.gitignore
