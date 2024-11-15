@@ -5,7 +5,7 @@
 #include <gsl/gsl_vector.h>
 
 
-void my_sparse_coo(gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
+void my_sparse_coo_gsl(gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
 {
   size_t i, tot_elem = mat->nz;
   int row, col;
@@ -25,7 +25,7 @@ void my_sparse_coo(gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
   }
 }
 
-void my_sparse_csr(size_t n, gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
+void my_sparse_csr_gsl(size_t n, gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
 {
   size_t i;
   int j, row, col;
@@ -56,7 +56,7 @@ void my_sparse_csr(size_t n, gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *res
   }
 }
 
-void my_sparse_csc(size_t n, gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
+void my_sparse_csc_gsl(size_t n, gsl_spmatrix *mat, gsl_vector *vec, gsl_vector *result)
 {
   size_t i;
   int j, row, col;
@@ -111,6 +111,59 @@ void my_sparse_coo_icc(MKL_INT *rows, MKL_INT *cols, double *values, double *vec
     result_element += mat_element * vec_element;
     // gsl_vector_set(result, row, result_element);
     result[row] = result_element;
+  }
+}
+
+void my_sparse_csr_icc(MKL_INT *rows, MKL_INT *cols, double *values, double *vec, double *result, int n)
+{
+  int i, j, row, col;
+  int n_elem, n_elem_total = 0;
+
+  // Initialize result array to zero
+  for (i = 0; i < n; i++)
+    result[i] = 0.0;
+
+  for (i = 0; i < n; i++)
+  {
+    // Get how many elements are in row i
+    n_elem = rows[i + 1] - rows[i];
+
+    // For each element in the row
+    for (j = 0; j < n_elem; j++)
+    {
+      row = i;
+      col = cols[n_elem_total + j];
+
+      // Perform the multiplication and accumulate
+      result[row] += values[n_elem_total + j] * vec[col];
+    }
+    n_elem_total += n_elem;
+  }
+}
+
+void my_sparse_csc_icc(MKL_INT *rows, MKL_INT *cols, double *values, double *vec, double *result, int n)
+{
+  int i, j, row, col;
+  int n_elem;
+
+  // Initialize result array to zero
+  for (i = 0; i < n; i++)
+    result[i] = 0.0;
+
+  for (i = 0; i < n; i++)
+  {
+    // Get how many elements are in column i
+    n_elem = cols[i + 1] - cols[i];
+
+    // For each element in the column
+    for (j = 0; j < n_elem; j++)
+    {
+      col = i;
+      row = rows[cols[i] + j];
+
+      // Perform the multiplication and accumulate
+      result[row] += values[cols[i] + j] * vec[col];
+    }
   }
 }
 #endif

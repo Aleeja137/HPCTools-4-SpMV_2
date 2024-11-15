@@ -5,3 +5,4 @@ spvm
 spmv.o
 timer.o
 .gitignore
+script.sh
