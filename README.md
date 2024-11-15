@@ -49,9 +49,9 @@ The following time measurements were taken as the average of 5 distinct executio
 | my_csr   | 105 | 34       | 34     | x    | 23  |
 | my_csc   | 121 | 73       | 73     | x    | 73  |
 
-It appears that the gcc compiler, aside from the my_dense function, does not optimize well my code. Maybe the other functions are not simple enough (could be rewritten ina more straightforward way) or maybe it requires help with flags. Nevertheless, the sheer sparse computation speed using GSL library impressed me.  
+It appears that the gcc compiler, aside from the my_dense function, does not optimize well my code. Maybe the other functions are not simple enough (could be rewritten in a more straightforward way) or maybe it requires help with flags. Nevertheless, the sheer sparse computation speed using GSL library impressed me.  
 
-On the other hand, the icc compiler seems to optimize really well both MKL's and my implementations. This makes sense since the processor on FT3 computing nodes is from Intel, and their compiler is designed to make the most of Intel's architecture knowledge about their processors. Also, for this case, it looks like my implementation was optimized a lot. The sparse computation speed is even more impressing.    
+On the other hand, the icc compiler seems to optimize really well both MKL's and my implementation. This makes sense since the processor on FT3 computing nodes is from Intel (Intel Xeon Platinum 8352Y), and their compiler is designed to make the most of Intel's architecture knowledge about their processors. Also, for this case, it looks like my implementation was optimized a lot. The sparse computation speed is even more impressing.    
 
 I could not make the icc-fast target work. It is strange since I used almost the same flags as the other targets, but an error pops up with `unresolved mkl_blas_lp64_daxpy`. I tried linking libraries, loading other modules, etc. Still did not work.    
 

@@ -6,3 +6,5 @@ spmv.o
 timer.o
 .gitignore
 script.sh
+aux.txt
+aux*
